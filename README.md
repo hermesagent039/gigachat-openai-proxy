@@ -1,83 +1,228 @@
-# GigaChat OAuth Proxy
+# GigaChat OpenAI-Compatible Proxy
 
-Standalone Python proxy between Hermes/OpenAI-compatible clients and the GigaChat API.
+Универсальный HTTP-прокси между клиентами с OpenAI-совместимым API и GigaChat.
+
+Проект не привязан к конкретному приложению или фреймворку-клиенту.
 
 ```text
-Hermes / OpenAI-compatible client
-              │
-              ▼
-       gigachat-proxy :8766
-              │  OAuth + API adaptation
-              ▼
-       GigaChat OAuth/API
+OpenAI-compatible client
+          │
+          ▼
+GigaChat OpenAI-Compatible Proxy :8766
+          │
+          ├── OAuth GigaChat
+          ├── TLS через CA bundle
+          ├── адаптация chat completions
+          └── адаптация tools/function calls
+          │
+          ▼
+GigaChat API
 ```
 
-## Why this proxy exists
+## Возможности
 
-GigaChat's API and tool-calling format differ from the OpenAI-compatible interface used by Hermes and other clients. The proxy keeps that compatibility logic in one service:
+- OAuth-токен GigaChat с кешированием до истечения срока действия;
+- OpenAI-совместимые endpoints:
+  - `GET /v1/models`;
+  - `POST /v1/chat/completions`;
+- поддержка обычных и streaming-запросов;
+- преобразование OpenAI `tools`/`tool_calls` в формат GigaChat `functions`/`function_call`;
+- нормализация JSON Schema для GigaChat;
+- явный allowlist поддерживаемых инструментов;
+- read-only инструменты OpenViking:
+  - `viking_search`;
+  - `viking_read`;
+  - `viking_browse`;
+- проверка реального OAuth через `GET /health`;
+- подключение пользовательского CA bundle для TLS GigaChat.
 
-- obtains and caches GigaChat OAuth access tokens;
-- validates TLS with the configured GigaChat CA bundle;
-- exposes `/v1/models` and `/v1/chat/completions`;
-- converts OpenAI `tools` / `tool_calls` to GigaChat legacy `functions` / `function_call`;
-- filters tools through an explicit allowlist;
-- supports streaming responses at the compatibility boundary;
-- exposes `/health`, where `oauth: true` means that the credential was actually accepted;
-- provides read-only OpenViking tools: `viking_search`, `viking_read`, `viking_browse`.
+## Конфигурация
 
-This repository contains the proxy only. Prompt Vault is an existing client/integration and is not part of this repository.
+Прокси использует:
 
-## Configuration
+```text
+GIGACHAT_PROXY_HOME/.env
+GIGACHAT_PROXY_HOME/certs/gigachat-ca-bundle.pem
+```
 
-The proxy reads `GIGACHAT_CREDENTIALS` from `${HERMES_HOME}/.env` and the CA bundle from `${HERMES_HOME}/certs/gigachat-ca-bundle.pem`.
+Переменная окружения по умолчанию:
 
-For local Compose:
+```text
+GIGACHAT_PROXY_HOME=~/.gigachat-proxy
+```
+
+В `.env` должен находиться credential GigaChat:
+
+```env
+GIGACHAT_CREDENTIALS=ваш-локальный-credential
+```
+
+Реальные credentials и сертификаты не входят в Git и Docker image.
+
+Подготовка локальных файлов:
 
 ```bash
 mkdir -p secrets
 cp secrets/gigachat.env.example secrets/gigachat.env
-# Put the actual GigaChat credential into secrets/gigachat.env locally.
-# Put the actual CA bundle into secrets/gigachat-ca-bundle.pem.
+cp /path/to/gigachat-ca-bundle.pem secrets/gigachat-ca-bundle.pem
 chmod 600 secrets/gigachat.env
 ```
 
-Never commit either real file or print the credential to logs/chat.
+Не добавляйте реальные файлы из `secrets/` в Git.
 
-## Docker Compose
+## API
 
-Requirements: Docker Engine and Compose v2.
+### Проверка proxy и OAuth
 
 ```bash
-docker compose config --quiet
-docker compose up -d --build
-curl -fsS http://127.0.0.1:8766/health
-docker compose logs --no-log-prefix gigachat-proxy
-docker compose down
+curl -fsS http://127.0.0.1:18786/health
 ```
 
-The service is published on `0.0.0.0:18786` by default through the Compose port mapping. Override with `GIGACHAT_PROXY_PORT` if required.
-
-Expected successful health response:
+Успешный ответ:
 
 ```json
 {"ok":true,"oauth":true}
 ```
 
-A JSON response with HTTP 200 and `"oauth": false` is a failed proxy health state, not a successful OAuth check.
+HTTP 200 с `"oauth": false` означает, что proxy запущен, но credential не принят GigaChat.
 
-## API
-
-- `GET /health` — liveness plus real OAuth validation;
-- `GET /v1/models` — GigaChat model list;
-- `POST /v1/chat/completions` — OpenAI-compatible chat endpoint.
-
-Example:
+### Список моделей
 
 ```bash
-curl -fsS http://127.0.0.1:8766/v1/models
+curl -fsS http://127.0.0.1:18786/v1/models
 ```
 
-## Development and verification
+### Chat completions
+
+```bash
+curl -fsS -X POST \
+  http://127.0.0.1:18786/v1/chat/completions \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "model": "GigaChat-2-Max",
+    "messages": [
+      {"role": "user", "content": "Кратко объясни, что делает этот proxy."}
+    ],
+    "temperature": 0.4,
+    "max_tokens": 1200
+  }'
+```
+
+## Вариант 1: локальная сборка из репозитория
+
+Требуются Docker Engine и Compose v2.
+
+```bash
+git clone https://github.com/hermesagent039/gigachat-openai-proxy.git
+cd gigachat-openai-proxy
+
+mkdir -p secrets
+cp secrets/gigachat.env.example secrets/gigachat.env
+cp /path/to/gigachat-ca-bundle.pem secrets/gigachat-ca-bundle.pem
+chmod 600 secrets/gigachat.env
+
+sudo docker compose config --quiet
+sudo docker compose up -d --build
+```
+
+Проверка:
+
+```bash
+curl -fsS http://127.0.0.1:18786/health
+sudo docker compose ps
+sudo docker compose logs --no-log-prefix gigachat-proxy
+```
+
+Остановка:
+
+```bash
+sudo docker compose down
+```
+
+Порт можно изменить без редактирования Compose:
+
+```bash
+GIGACHAT_PROXY_PORT=8766 sudo -E docker compose up -d --build
+```
+
+## Вариант 2: запуск готового образа из Docker Hub
+
+Образ публикуется GitHub Actions в Docker Hub. Подставьте имя пользователя Docker Hub вместо `<DOCKERHUB_USERNAME>`.
+
+```bash
+mkdir -p "$HOME/.gigachat-proxy/certs"
+cp /path/to/gigachat-ca-bundle.pem "$HOME/.gigachat-proxy/certs/gigachat-ca-bundle.pem"
+printf '%s\n' 'GIGACHAT_CREDENTIALS=ваш-локальный-credential' > "$HOME/.gigachat-proxy/.env"
+chmod 600 "$HOME/.gigachat-proxy/.env"
+
+sudo docker run -d \
+  --name gigachat-openai-proxy \
+  --restart unless-stopped \
+  -p 18786:8766 \
+  -e GIGACHAT_PROXY_HOME=/run/gigachat \
+  -v "$HOME/.gigachat-proxy/.env:/run/gigachat/.env:ro" \
+  -v "$HOME/.gigachat-proxy/certs/gigachat-ca-bundle.pem:/run/gigachat/certs/gigachat-ca-bundle.pem:ro" \
+  <DOCKERHUB_USERNAME>/gigachat-openai-proxy:main
+```
+
+Проверка образа:
+
+```bash
+curl -fsS http://127.0.0.1:18786/health
+sudo docker ps --filter name=gigachat-openai-proxy
+```
+
+Запуск готового образа через Compose:
+
+```yaml
+services:
+  gigachat-proxy:
+    image: <DOCKERHUB_USERNAME>/gigachat-openai-proxy:main
+    user: "0:0"
+    ports:
+      - "18786:8766"
+    env_file:
+      - ./secrets/gigachat.env
+    environment:
+      GIGACHAT_PROXY_HOME: /run/gigachat
+    volumes:
+      - ./secrets/gigachat.env:/run/gigachat/.env:ro
+      - ./secrets/gigachat-ca-bundle.pem:/run/gigachat/certs/gigachat-ca-bundle.pem:ro
+    restart: unless-stopped
+```
+
+Для воспроизводимого запуска вместо `main` используйте SHA-тег, опубликованный workflow, например:
+
+```text
+<DOCKERHUB_USERNAME>/gigachat-openai-proxy:sha-<COMMIT_SHA>
+```
+
+## Docker Hub и GitHub Actions
+
+Workflow находится в `.github/workflows/ci.yml`.
+
+Для публикации используются только GitHub Actions secrets:
+
+```text
+DOCKERHUB_USERNAME
+DOCKERHUB_TOKEN
+```
+
+Значения не находятся в исходниках, workflow, Dockerfile, Git history или README.
+
+CI выполняет:
+
+1. установку зависимостей;
+2. unit-тесты;
+3. проверку синтаксиса Python;
+4. проверку Docker Compose;
+5. сборку Docker image;
+6. публикацию image в Docker Hub для `main`, tag push и ручного запуска;
+7. проверку опубликованного image digest через Docker Buildx.
+
+Pull Request проверяет и собирает image, но не выполняет Docker Hub login и push.
+
+## Разработка
 
 ```bash
 python3 -m venv .venv
@@ -87,24 +232,12 @@ pytest -q
 python -m py_compile gigachat_proxy.py
 ```
 
-The test suite validates request translation and tool/schema filtering without contacting GigaChat or requiring secrets.
+## Безопасность
 
-## GitHub Actions
-
-`.github/workflows/ci.yml` runs on pushes, pull requests, and manual dispatch. It:
-
-1. installs Python dependencies;
-2. runs unit tests and syntax checks;
-3. validates Docker Compose;
-4. builds the proxy image with Docker Buildx;
-5. starts the Compose service with CI placeholder files and checks container health.
-
-The workflow does not publish an image and does not require GigaChat credentials. Registry publishing can be added later using GitHub Actions secrets.
-
-## Security
-
-- credentials and CA files are excluded by `.gitignore` and `.dockerignore`;
-- the image runs as a non-root user by default;
-- Compose uses `user: "0:0"` only to read root-owned bind-mounted secret files, while the image itself remains non-root outside this local bind-mount mode;
-- tool execution is restricted by `TOOL_ALLOWLIST`;
-- do not expose the proxy publicly without authentication and network policy.
+- credentials передаются через локальный env-файл или GitHub Actions secrets;
+- credentials и CA bundle монтируются в контейнер только read-only;
+- реальные secret-файлы исключены из Git и Docker build context;
+- image запускается от непривилегированного пользователя по умолчанию;
+- инструментальный интерфейс ограничен allowlist;
+- не публикуйте proxy в интернет без дополнительной аутентификации и сетевых ограничений;
+- `/health` не скрывает ошибку OAuth: `oauth: false` считается неготовым состоянием provider-интеграции.

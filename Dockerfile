@@ -2,7 +2,7 @@ FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
-    HERMES_HOME=/run/gigachat
+    GIGACHAT_PROXY_HOME=/run/gigachat
 
 WORKDIR /proxy
 COPY requirements.txt .

@@ -15,22 +15,21 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 
-HERMES_HOME = Path(os.environ.get("HERMES_HOME", str(Path.home() / ".hermes")))
-ENV_FILE = HERMES_HOME / ".env"
-CA_BUNDLE = HERMES_HOME / "certs" / "gigachat-ca-bundle.pem"
+PROXY_HOME = Path(os.environ.get("GIGACHAT_PROXY_HOME", str(Path.home() / ".gigachat-proxy")))
+ENV_FILE = PROXY_HOME / ".env"
+CA_BUNDLE = PROXY_HOME / "certs" / "gigachat-ca-bundle.pem"
 OAUTH_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
 API_BASE = "https://gigachat.devices.sberbank.ru/api/v1"
 SCOPE = "GIGACHAT_API_PERS"
-# This provider is dedicated to the Calendar topic. GigaChat becomes unreliable
-# when Hermes sends dozens of unrelated functions, so expose only the compact
-# file/shell skill set needed by Google Workspace workflows.
+# Keep the exposed tool surface explicit: provider requests may contain many
+# unrelated tools, while this proxy only forwards the approved compatibility set.
 TOOL_ALLOWLIST = {
     "terminal", "execute_code", "process", "read_file", "search_files",
     "skill_view", "skills_list", "clarify",
     "viking_search", "viking_read", "viking_browse",
 }
 
-app = FastAPI(title="Hermes GigaChat OAuth Proxy")
+app = FastAPI(title="GigaChat OpenAI-Compatible Proxy")
 _token: str | None = None
 _expires_at = 0.0
 _lock = asyncio.Lock()
@@ -38,7 +37,7 @@ _lock = asyncio.Lock()
 
 def _credential() -> str:
     if not ENV_FILE.exists():
-        raise RuntimeError("Hermes .env is missing")
+        raise RuntimeError("GigaChat proxy .env is missing")
     for raw in ENV_FILE.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:
@@ -146,7 +145,7 @@ def _gigachat_schema(value: object) -> object:
     alternatives = schema.pop("oneOf", None) or schema.pop("anyOf", None)
     if alternatives:
         # GigaChat rejects union schemas. Prefer the first non-null branch;
-        # Hermes still validates the actual tool call before execution.
+        # The client still validates the actual tool call before execution.
         branch = next(
             (item for item in alternatives if isinstance(item, dict) and item.get("type") != "null"),
             alternatives[0],

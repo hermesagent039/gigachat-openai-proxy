@@ -7,7 +7,7 @@ services:
     env_file:
       - ./secrets/gigachat.env
     environment:
-      HERMES_HOME: /run/gigachat
+      GIGACHAT_PROXY_HOME: /run/gigachat
     volumes:
       - ./secrets/gigachat.env:/run/gigachat/.env:ro
       - ./secrets/gigachat-ca-bundle.pem:/run/gigachat/certs/gigachat-ca-bundle.pem:ro
