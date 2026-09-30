@@ -60,7 +60,6 @@ GIGACHAT_CREDENTIALS=ваш-локальный-credential
 ```bash
 mkdir -p secrets
 cp secrets/gigachat.env.example secrets/gigachat.env
-cp /path/to/gigachat-ca-bundle.pem secrets/gigachat-ca-bundle.pem
 chmod 600 secrets/gigachat.env
 ```
 
@@ -114,7 +113,6 @@ cd gigachat-openai-proxy
 
 mkdir -p secrets
 cp secrets/gigachat.env.example secrets/gigachat.env
-cp /path/to/gigachat-ca-bundle.pem secrets/gigachat-ca-bundle.pem
 chmod 600 secrets/gigachat.env
 
 sudo docker compose config --quiet
@@ -143,11 +141,10 @@ GIGACHAT_PROXY_PORT=8766 sudo -E docker compose up -d --build
 
 ## Вариант 2: запуск готового образа из Docker Hub
 
-Образ публикуется GitHub Actions в Docker Hub. Подставьте имя пользователя Docker Hub вместо `<DOCKERHUB_USERNAME>`.
+Образ публикуется GitHub Actions в Docker Hub. CA bundle GigaChat уже включён в образ и отдельно скачивать или монтировать его не нужно. Подставьте имя пользователя Docker Hub вместо `<DOCKERHUB_USERNAME>`.
 
 ```bash
-mkdir -p "$HOME/.gigachat-proxy/certs"
-cp /path/to/gigachat-ca-bundle.pem "$HOME/.gigachat-proxy/certs/gigachat-ca-bundle.pem"
+mkdir -p "$HOME/.gigachat-proxy"
 printf '%s\n' 'GIGACHAT_CREDENTIALS=ваш-локальный-credential' > "$HOME/.gigachat-proxy/.env"
 chmod 600 "$HOME/.gigachat-proxy/.env"
 
@@ -157,7 +154,6 @@ sudo docker run -d \
   -p 18786:8766 \
   -e GIGACHAT_PROXY_HOME=/run/gigachat \
   -v "$HOME/.gigachat-proxy/.env:/run/gigachat/.env:ro" \
-  -v "$HOME/.gigachat-proxy/certs/gigachat-ca-bundle.pem:/run/gigachat/certs/gigachat-ca-bundle.pem:ro" \
   <DOCKERHUB_USERNAME>/gigachat-openai-proxy:main
 ```
 
@@ -183,7 +179,6 @@ services:
       GIGACHAT_PROXY_HOME: /run/gigachat
     volumes:
       - ./secrets/gigachat.env:/run/gigachat/.env:ro
-      - ./secrets/gigachat-ca-bundle.pem:/run/gigachat/certs/gigachat-ca-bundle.pem:ro
     restart: unless-stopped
 ```
 
