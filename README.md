@@ -28,11 +28,7 @@ GigaChat API
 - поддержка обычных и streaming-запросов;
 - преобразование OpenAI `tools`/`tool_calls` в формат GigaChat `functions`/`function_call`;
 - нормализация JSON Schema для GigaChat;
-- явный allowlist поддерживаемых инструментов;
-- read-only инструменты OpenViking:
-  - `viking_search`;
-  - `viking_read`;
-  - `viking_browse`;
+- преобразование вызовов функций и результатов инструментов;
 - проверка реального OAuth через `GET /health`;
 - подключение пользовательского CA bundle для TLS GigaChat.
 

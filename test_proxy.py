@@ -30,14 +30,14 @@ def test_to_gigachat_filters_tools_and_converts_tool_messages():
                 "tool_calls": [{
                     "id": "call-1",
                     "type": "function",
-                    "function": {"name": "viking_search", "arguments": '{"query":"docs"}'},
+                    "function": {"name": "lookup_record", "arguments": '{"id":42}'},
                 }],
             },
-            {"role": "tool", "tool_call_id": "call-1", "name": "viking_search", "content": "{\"ok\":true}"},
+            {"role": "tool", "tool_call_id": "call-1", "name": "lookup_record", "content": "{\"ok\":true}"},
         ],
         "tools": [
-            {"type": "function", "function": {"name": "viking_search", "parameters": {"type": "object"}}},
-            {"type": "function", "function": {"name": "not_allowed", "parameters": {"type": "object"}}},
+            {"type": "function", "function": {"name": "lookup_record", "parameters": {"type": "object"}}},
+            {"type": "function", "function": {"name": "send_notification", "parameters": {"type": "object"}}},
         ],
         "tool_choice": "auto",
         "stream": True,
@@ -45,7 +45,7 @@ def test_to_gigachat_filters_tools_and_converts_tool_messages():
     result, client_stream = _to_gigachat(payload)
     assert client_stream is True
     assert result["stream"] is False
-    assert [f["name"] for f in result["functions"]] == ["viking_search"]
-    assert result["messages"][1]["function_call"]["arguments"] == {"query": "docs"}
+    assert [f["name"] for f in result["functions"]] == ["lookup_record", "send_notification"]
+    assert result["messages"][1]["function_call"]["arguments"] == {"id": 42}
     assert result["messages"][2]["role"] == "function"
     json.loads(result["messages"][2]["content"])

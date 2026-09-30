@@ -5,7 +5,6 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import re
 import time
 import uuid
 from pathlib import Path
@@ -21,13 +20,6 @@ CA_BUNDLE = PROXY_HOME / "certs" / "gigachat-ca-bundle.pem"
 OAUTH_URL = "https://ngw.devices.sberbank.ru:9443/api/v2/oauth"
 API_BASE = "https://gigachat.devices.sberbank.ru/api/v1"
 SCOPE = "GIGACHAT_API_PERS"
-# Keep the exposed tool surface explicit: provider requests may contain many
-# unrelated tools, while this proxy only forwards the approved compatibility set.
-TOOL_ALLOWLIST = {
-    "terminal", "execute_code", "process", "read_file", "search_files",
-    "skill_view", "skills_list", "clarify",
-    "viking_search", "viking_read", "viking_browse",
-}
 
 app = FastAPI(title="GigaChat OpenAI-Compatible Proxy")
 _token: str | None = None
@@ -185,16 +177,6 @@ def _to_gigachat(payload: dict) -> tuple[dict, bool]:
             if tool.get("type") != "function" or not tool.get("function"):
                 continue
             function = dict(tool["function"])
-            if function.get("name") not in TOOL_ALLOWLIST:
-                continue
-            if function.get("name") == "terminal":
-                function["description"] = (function.get("description") or "") + (
-                    "\nCalendar fast path: for two or more Google Calendar events, first list once, "
-                    "then run google_api.py calendar batch-create once with repeated "
-                    "--event 'SUMMARY|START|END|LOCATION' arguments, then list once to verify. "
-                    "Prefer repeated --event over --events-json to avoid shell quoting errors. "
-                    "Never call calendar create separately for each event."
-                )
             function["parameters"] = _gigachat_schema(function.get("parameters") or {"type": "object", "properties": {}})
             data["functions"].append(function)
         choice = data.pop("tool_choice", "auto")
