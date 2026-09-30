@@ -79,7 +79,7 @@ curl -fsS http://127.0.0.1:18786/health
 {"ok":true,"oauth":true}
 ```
 
-HTTP 200 с `"oauth": false` означает, что proxy запущен, но credential не принят GigaChat.
+HTTP 503 с `"oauth": false` означает, что proxy запущен, но credential не принят GigaChat.
 
 ### Список моделей
 

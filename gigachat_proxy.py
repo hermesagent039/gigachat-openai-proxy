@@ -81,12 +81,15 @@ async def _headers() -> dict[str, str]:
 
 
 @app.get("/health")
-async def health() -> dict[str, object]:
+async def health() -> JSONResponse:
     try:
         await _access_token()
-        return {"ok": True, "oauth": True}
+        return JSONResponse({"ok": True, "oauth": True})
     except Exception as exc:
-        return {"ok": False, "oauth": False, "error": str(exc)}
+        return JSONResponse(
+            {"ok": False, "oauth": False, "error": str(exc)},
+            status_code=503,
+        )
 
 
 @app.get("/v1/models")

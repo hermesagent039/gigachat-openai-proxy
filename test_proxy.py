@@ -1,6 +1,22 @@
+import asyncio
 import json
 
-from gigachat_proxy import _credential, _gigachat_schema, _to_gigachat
+import gigachat_proxy
+from gigachat_proxy import _credential, _gigachat_schema, _to_gigachat, health
+
+
+def test_health_returns_503_when_oauth_fails(monkeypatch):
+    async def fail_token():
+        raise RuntimeError("oauth failed")
+
+    monkeypatch.setattr(gigachat_proxy, "_access_token", fail_token)
+    response = asyncio.run(health())
+    assert response.status_code == 503
+    assert json.loads(response.body) == {
+        "ok": False,
+        "oauth": False,
+        "error": "oauth failed",
+    }
 
 
 def test_credential_prefers_environment(monkeypatch):
