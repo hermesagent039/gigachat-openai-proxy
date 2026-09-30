@@ -28,8 +28,11 @@ _lock = asyncio.Lock()
 
 
 def _credential() -> str:
+    configured = os.environ.get("GIGACHAT_CREDENTIALS", "").strip().strip("\"").strip("'")
+    if configured:
+        return configured
     if not ENV_FILE.exists():
-        raise RuntimeError("GigaChat proxy .env is missing")
+        raise RuntimeError("GIGACHAT_CREDENTIALS is not configured")
     for raw in ENV_FILE.read_text(encoding="utf-8").splitlines():
         line = raw.strip()
         if not line or line.startswith("#") or "=" not in line:

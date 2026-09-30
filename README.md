@@ -37,8 +37,8 @@ GigaChat API
 Прокси использует:
 
 ```text
-GIGACHAT_PROXY_HOME/.env
 GIGACHAT_PROXY_HOME/certs/gigachat-ca-bundle.pem
+GIGACHAT_CREDENTIALS из окружения
 ```
 
 Переменная окружения по умолчанию:
@@ -47,23 +47,23 @@ GIGACHAT_PROXY_HOME/certs/gigachat-ca-bundle.pem
 GIGACHAT_PROXY_HOME=~/.gigachat-proxy
 ```
 
-В `.env` должен находиться credential GigaChat:
+В корне проекта создайте `.env` на основе `.env.example`:
 
 ```env
 GIGACHAT_CREDENTIALS=ваш-локальный-credential
 ```
 
-Реальные credentials и сертификаты не входят в Git и Docker image.
+`.env` используется Compose как `env_file` и передаётся процессу напрямую; монтировать его
+в контейнер через volume не требуется. CA bundle GigaChat уже входит в Docker image.
 
-Подготовка локальных файлов:
+Подготовка локального файла:
 
 ```bash
-mkdir -p secrets
-cp secrets/gigachat.env.example secrets/gigachat.env
-chmod 600 secrets/gigachat.env
+cp .env.example .env
+chmod 600 .env
 ```
 
-Не добавляйте реальные файлы из `secrets/` в Git.
+Не добавляйте `.env` в Git.
 
 ## API
 
@@ -111,9 +111,8 @@ curl -fsS -X POST \
 git clone https://github.com/hermesagent039/gigachat-openai-proxy.git
 cd gigachat-openai-proxy
 
-mkdir -p secrets
-cp secrets/gigachat.env.example secrets/gigachat.env
-chmod 600 secrets/gigachat.env
+cp .env.example .env
+chmod 600 .env
 
 sudo docker compose config --quiet
 sudo docker compose up -d --build
@@ -145,15 +144,14 @@ GIGACHAT_PROXY_PORT=8766 sudo -E docker compose up -d --build
 
 ```bash
 mkdir -p "$HOME/.gigachat-proxy"
-printf '%s\n' 'GIGACHAT_CREDENTIALS=ваш-локальный-credential' > "$HOME/.gigachat-proxy/.env"
+cp .env.example "$HOME/.gigachat-proxy/.env"
 chmod 600 "$HOME/.gigachat-proxy/.env"
 
 sudo docker run -d \
   --name gigachat-openai-proxy \
   --restart unless-stopped \
   -p 18786:8766 \
-  -e GIGACHAT_PROXY_HOME=/run/gigachat \
-  -v "$HOME/.gigachat-proxy/.env:/run/gigachat/.env:ro" \
+  --env-file "$HOME/.gigachat-proxy/.env" \
   <DOCKERHUB_USERNAME>/gigachat-openai-proxy:main
 ```
 
@@ -170,15 +168,10 @@ sudo docker ps --filter name=gigachat-openai-proxy
 services:
   gigachat-proxy:
     image: <DOCKERHUB_USERNAME>/gigachat-openai-proxy:main
-    user: "0:0"
     ports:
       - "18786:8766"
     env_file:
-      - ./secrets/gigachat.env
-    environment:
-      GIGACHAT_PROXY_HOME: /run/gigachat
-    volumes:
-      - ./secrets/gigachat.env:/run/gigachat/.env:ro
+      - ./.env
     restart: unless-stopped
 ```
 
@@ -225,10 +218,10 @@ python -m py_compile gigachat_proxy.py
 
 ## Безопасность
 
-- credentials передаются через локальный env-файл или GitHub Actions secrets;
-- credentials и CA bundle монтируются в контейнер только read-only;
-- реальные secret-файлы исключены из Git и Docker build context;
+- credentials передаются через локальный `.env` или GitHub Actions secrets;
+- credentials не попадают в Docker image;
+- CA bundle входит в Docker image и не требует отдельного скачивания;
+- `.env` исключён из Git и Docker build context;
 - image запускается от непривилегированного пользователя по умолчанию;
-- инструментальный интерфейс ограничен allowlist;
 - не публикуйте proxy в интернет без дополнительной аутентификации и сетевых ограничений;
 - `/health` не скрывает ошибку OAuth: `oauth: false` считается неготовым состоянием provider-интеграции.

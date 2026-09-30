@@ -33,9 +33,7 @@ jobs:
 
       - name: Prepare CI-only secret placeholders
         run: |
-          mkdir -p secrets
-          printf '%s\n' 'GIGACHAT_CREDENTIALS=ci-placeholder' > secrets/gigachat.env
-          : > secrets/gigachat-ca-bundle.pem
+          printf '%s\n' 'GIGACHAT_CREDENTIALS=ci-placeholder' > .env
 
       - name: Validate Compose
         run: docker compose config --quiet
@@ -48,10 +46,17 @@ jobs:
         with:
           context: .
           file: ./Dockerfile
+          load: true
           push: false
           tags: gigachat-proxy:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Verify bundled CA certificate
+        run: |
+          expected="$(sha256sum certs/gigachat-ca-bundle.pem | cut -d' ' -f1)"
+          actual="$(docker run --rm --entrypoint sha256sum gigachat-proxy:ci /run/gigachat/certs/gigachat-ca-bundle.pem | cut -d' ' -f1)"
+          test "$expected" = "$actual"
 
   publish-docker:
     name: Publish Docker image

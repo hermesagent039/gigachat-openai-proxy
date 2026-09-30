@@ -1,6 +1,11 @@
 import json
 
-from gigachat_proxy import _gigachat_schema, _to_gigachat
+from gigachat_proxy import _credential, _gigachat_schema, _to_gigachat
+
+
+def test_credential_prefers_environment(monkeypatch):
+    monkeypatch.setenv("GIGACHAT_CREDENTIALS", "env-credential")
+    assert _credential() == "env-credential"
 
 
 def test_schema_drops_openai_only_fields_and_flattens_union():
