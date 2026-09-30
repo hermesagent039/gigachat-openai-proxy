@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements-dev.txt
+
+      - name: Unit tests
+        run: pytest -q
+
+      - name: Syntax check
+        run: python -m py_compile gigachat_proxy.py
+
+      - name: Prepare CI-only secret placeholders
+        run: |
+          mkdir -p secrets
+          printf '%s\n' 'GIGACHAT_CREDENTIALS=ci-placeholder' > secrets/gigachat.env
+          : > secrets/gigachat-ca-bundle.pem
+
+      - name: Validate Compose
+        run: docker compose config --quiet
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: gigachat-proxy:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

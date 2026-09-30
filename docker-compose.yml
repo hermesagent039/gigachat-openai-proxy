@@ -1,0 +1,14 @@
+services:
+  gigachat-proxy:
+    build: .
+    user: "0:0"
+    ports:
+      - "${GIGACHAT_PROXY_PORT:-18786}:8766"
+    env_file:
+      - ./secrets/gigachat.env
+    environment:
+      HERMES_HOME: /run/gigachat
+    volumes:
+      - ./secrets/gigachat.env:/run/gigachat/.env:ro
+      - ./secrets/gigachat-ca-bundle.pem:/run/gigachat/certs/gigachat-ca-bundle.pem:ro
+    restart: unless-stopped
